@@ -1,4 +1,5 @@
 import telebot
+from nltk.corpus import wordnet as wn
 
 from logic import BotLogic
 
@@ -14,4 +15,5 @@ def handle(message):
     logic.process_message(message)
 
 if __name__ == "__main__":
+    wn.ensure_loaded()
     bot.polling(none_stop=True, interval=0)

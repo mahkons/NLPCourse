@@ -6,6 +6,10 @@ from pyowm.utils import timestamps
 with open(".weather", 'r') as f:
     weather_secret = f.read()[:-1]
 fortune_teller = pyowm.OWM(weather_secret)
+reg = fortune_teller.city_id_registry()
+moscow = reg.locations_for('moscow', country='RU')[0]
+piter = reg.locations_for('saint petersburg', country='RU')[0]
+cities_loc = {'Москва': moscow, 'Санкт-Петербург': piter}
 
 
 def preprocess(text):
@@ -22,11 +26,11 @@ def preprocess(text):
 
 def is_hello(tokens, text):
     return any([h in tokens for h in ["привет", "здравствуй"]]) or any([h in text for h in
-        ["добрый день", "добрый вечер", "добрый ночь", "добрый утро"]]) # it is dangerous to read
+        ["добрый день", "добрый вечер", "доброй ночь", "доброе утро"]])
     
 
 def is_bye(tokens, text):
-    return any([h in tokens for h in ["пока", "прощай", "удачи"]]) or "до свидание" in text # aaargh my eyes
+    return any([h in tokens for h in ["пока", "прощай", "удачи"]]) or "до свидания" in text
 
 
 class BotLogic():
@@ -45,9 +49,9 @@ class BotLogic():
         return self.city is not None and self.date is not None
 
     def update_info(self, tokens, text):
-        if "москва" in tokens:
+        if any([h in tokens for h in ["москва", "москве", "москву", "московии"]]):
             self.city = "Москва"
-        if any([h in tokens for h in ["спб", "санкт-петербург", "петербург", "питер"]]):
+        if any([h in tokens for h in ["спб", "санкт-петербург", "петербург", "питер", "санкт-петербурге", "петербурге", "питере"]]):
             self.city = "Санкт-Петербург"
 
         if "сегодня" in tokens or "сейчас" in tokens or "нынче" in tokens:
@@ -57,10 +61,11 @@ class BotLogic():
 
 
     def get_weather(self):
-        forecast = fortune_teller.weather_manager().forecast_at_place(self.city, 'daily')
+        loc = cities_loc[self.city]
+        forecast = fortune_teller.weather_manager().one_call(lat = loc.lat, lon=loc.lon).forecast_daily
         weather = forecast[self.date]
         temp = weather.temperature('celsius')
-        return "{}; temperature: {}; feels like {}".format(weather.status, temp['temp'], temp['feels_like'])
+        return "{} temperature: {} feels like {}".format(weather.status, temp['day'], temp['feels_like_day'])
 
     def request(self):
         if self.city is None and self.date is None:
@@ -84,15 +89,17 @@ class BotLogic():
                 self.bot.send_message(message.from_user.id, "Для начала работы поприветствуйте бота")
                 return
 
+        bye = is_bye(tokens, text)
         
         self.update_info(tokens, text)
         if self.has_info():
             answer += self.get_weather()
             self.city, self.date = None, None
-        else:
+        elif not bye:
             answer += self.request()
+        answer += '\n'
 
-        if is_bye(tokens):
+        if bye:
             self.active = False
             self.city = None
             self.date = None
